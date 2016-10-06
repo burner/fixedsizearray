@@ -39,6 +39,14 @@ struct FixedSizeArraySlice(FSA,T, size_t Size) {
 	}
 
 	pragma(inline, true);
+	void insertBack(S)(auto ref S s) {
+		(*this.fsa).insertBack(s);
+	}
+
+	/// Ditto
+	alias put = insertBack;
+
+	pragma(inline, true);
 	ref T opIndex(const size_t idx) {
 		return (*this.fsa)[this.low + idx];
 	}
@@ -77,13 +85,46 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	}
 
 	pragma(inline, true);
-	void insertBack(S)(auto ref S t) @trusted {
+	void insertBack(S)(auto ref S t) @trusted if(is(Unqual!(S) == T)) {
 		import std.conv : emplace;
-		static assert(isImplicitlyConvertible!(S,T));
+		import std.stdio;
 		assert(this.len + 1 < Size);
 
 		emplace(cast(T*)(&this.store[this.len * T.sizeof]), t);
 		++this.len;
+	}
+
+	/// Ditto
+	pragma(inline, true);
+	void insertBack(S)(auto ref S s) @trusted if(!is(Unqual!(S) == T)) {
+		import std.traits;
+		import std.conv;
+
+		static if((isIntegral!T || isFloatingPoint!T) 
+				|| (isSomeChar!T && isSomeChar!U && T.sizeof >= U.sizeof)) 
+		{
+			this.insertBack!T(cast(T)(s));
+		} else static if (isSomeChar!T && isSomeChar!S && T.sizeof < S.sizeof) {
+            /* may throwable operation:
+             * - std.utf.encode
+             */
+            // must do some transcoding around here
+            import std.utf : encode;
+            Unqual!T[T.sizeof == 1 ? 4 : 2] encoded;
+            auto len = encode(encoded, s);
+			foreach(T it; encoded[0 .. len]) {
+				this.insertBack!T(it);
+			}
+        } else {
+			assert(false);
+		}
+	}
+
+	unittest {
+		FixedSizeArray!(int,32) fsa;
+		fsa.insertBack(1337);
+		assert(fsa.length == 1);
+		assert(fsa[0] == 1337);
 	}
 
 	pragma(inline, true);
@@ -106,11 +147,35 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		--this.len;
 	}
 
+	unittest {
+		FixedSizeArray!(int,32) fsa;
+		fsa.insertBack(1337);
+		assert(fsa.length == 1);
+		assert(fsa[0] == 1337);
+		
+		fsa.removeBack();
+		assert(fsa.length == 0);
+		assert(fsa.empty);
+	}
+
 	pragma(inline, true);
 	void removeAll() {
 		while(!this.empty) {
 			this.removeBack();
 		}
+	}
+
+	unittest {
+		FixedSizeArray!(int,32) fsa;
+		fsa.insertBack(1337);
+		fsa.insertBack(1338);
+		assert(fsa.length == 2);
+		assert(fsa[0] == 1337);
+		assert(fsa[1] == 1338);
+		
+		fsa.removeAll();
+		assert(fsa.length == 0);
+		assert(fsa.empty);
 	}
 
 	pragma(inline, true);
@@ -119,10 +184,22 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		return *(cast(T*)(&this.store[(this.len - 1) * T.sizeof]));
 	}
 
+	/// Ditto
 	pragma(inline, true);
 	@property ref T front() @trusted {
 		assert(this.len > 0);
 		return *(cast(T*)(this.store.ptr));
+	}
+
+	///
+	unittest {
+		FixedSizeArray!(int,32) fsa;
+		fsa.insertBack(1337);
+		fsa.insertBack(1338);
+		assert(fsa.length == 2);
+
+		assert(fsa.front == 1337);
+		assert(fsa.back == 1338);
 	}
 
 	pragma(inline, true);
@@ -131,10 +208,22 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		return *(cast(T*)(&this.store[idx * T.sizeof]));
 	}
 
+	/// Ditto
 	pragma(inline, true);
 	ref const(T) opIndex(const size_t idx) @trusted const {
 		cast(void)assertLess(idx,  this.len);
 		return *(cast(const(T)*)(&this.store[idx * T.sizeof]));
+	}
+
+	///
+	unittest {
+		FixedSizeArray!(int,32) fsa;
+		fsa.insertBack(1337);
+		fsa.insertBack(1338);
+		assert(fsa.length == 2);
+
+		assert(fsa[0] == 1337);
+		assert(fsa[1] == 1338);
 	}
 
 	pragma(inline, true);
@@ -142,9 +231,23 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		return this.len;
 	}
 
+	/// Ditto
 	pragma(inline, true);
 	@property size_t empty() const pure @nogc nothrow {
 		return this.len == 0UL;
+	}
+
+	///
+	unittest {
+		FixedSizeArray!(int,32) fsa;
+		assert(fsa.empty);
+		assert(fsa.length == 0);
+
+		fsa.insertBack(1337);
+		fsa.insertBack(1338);
+
+		assert(fsa.length == 2);
+		assert(!fsa.empty);
 	}
 
 	pragma(inline, true);
@@ -174,6 +277,31 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		return FixedSizeArraySlice!(typeof(this),const(T),Size)
 			(&this, cast(short)low, cast(short)high);
 	}
+
+	pragma(inline, true);
+	auto opCast(S)() {
+		return cast(S)(this.store[0 .. this.len]);
+	}
+
+	///
+	unittest {
+		FixedSizeArray!(char,32) fsa;
+		string h = "Hello World";
+
+		foreach(char c; h) {
+			fsa.insertBack(c);
+		}
+	
+		assert(cast(string)fsa == h);
+	}
+}
+
+unittest {
+	import std.format;
+
+	FixedSizeArray!(char,64) fsa;
+	formattedWrite(fsa[], "%s %s %s", "Hello", "World", 42);
+	assert(cast(string)fsa == "Hello World 42", cast(string)fsa);
 }
 
 pure nothrow unittest {
@@ -239,7 +367,7 @@ unittest {
 				assert(forward2.empty);
 
 				auto backward = fsa[];
-				auto backward2 = backward;
+				auto backward2 = backward.save;
 				cast(void)assertEqual(backward.length, jdx + 1);
 				for(size_t i = 0; i < backward.length; ++i) {
 					cast(void)assertEqual(backward[backward.length - i - 1],
@@ -252,7 +380,7 @@ unittest {
 					backward2.popBack();
 				}
 				assert(backward2.empty);
-				auto forward3 = fsa[];
+				auto forward3 = fsa[].save;
 				auto forward4 = fsa[0 .. jdx + 1];
 
 				while(!forward3.empty && !forward4.empty) {
@@ -269,7 +397,7 @@ unittest {
 				const(FixedSizeArray!(int,16))* constFsa;
 				constFsa = &fsa;
 				auto forward = (*constFsa)[];
-				auto forward2 = forward;
+				auto forward2 = forward.save;
 				cast(void)assertEqual(forward.length, jdx + 1);
 				for(size_t i = 0; i < forward.length; ++i) {
 					cast(void)assertEqual(cast(int)forward[i], it[i]);
@@ -279,7 +407,7 @@ unittest {
 				assert(forward2.empty);
 
 				auto backward = (*constFsa)[];
-				auto backward2 = backward;
+				auto backward2 = backward.save;
 				cast(void)assertEqual(backward.length, jdx + 1);
 				for(size_t i = 0; i < backward.length; ++i) {
 					cast(void)assertEqual(backward[backward.length - i - 1],
