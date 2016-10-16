@@ -438,6 +438,7 @@ unittest {
 
 unittest {
 	int cnt;
+	int cnt2;
 
 	struct Foo {
 		int* cnt;
@@ -445,24 +446,25 @@ unittest {
 		~this() { if(cnt) { ++(*cnt); } }
 	}
 
-	{
-		FixedSizeArray!(Foo) fsa;
-		fsa.insertBack(Foo(&cnt));
-		fsa.insertBack(Foo(&cnt));
-		fsa.insertBack(Foo(&cnt));
-		fsa.insertBack(Foo(&cnt));
+	int i = 0;
+	for(; i < 1000; ++i) {
+		{
+			FixedSizeArray!(Foo) fsa;
+			fsa.insertBack(Foo(&cnt));
+			fsa.insertBack(Foo(&cnt));
+			fsa.insertBack(Foo(&cnt));
+			fsa.insertBack(Foo(&cnt));
+		}
+
+		cast(void)assertEqual(cnt, 8 * i + 8);
+
+		{
+			FixedSizeArray!(Foo) fsa;
+			fsa.emplaceBack(&cnt2);
+			fsa.emplaceBack(&cnt2);
+			fsa.emplaceBack(&cnt2);
+			fsa.emplaceBack(&cnt2);
+		}
+		cast(void)assertEqual(cnt2, 4 * i + 4);
 	}
-
-	cast(void)assertEqual(cnt, 8);
-
-	int cnt2;
-	{
-		FixedSizeArray!(Foo) fsa;
-		fsa.emplaceBack(&cnt2);
-		fsa.emplaceBack(&cnt2);
-		fsa.emplaceBack(&cnt2);
-		fsa.emplaceBack(&cnt2);
-	}
-
-	cast(void)assertEqual(cnt2, 4);
 }
