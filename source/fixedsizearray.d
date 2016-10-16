@@ -99,7 +99,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		assert(this.length + 1 < Size);
 
 		*(cast(T*)(&this.store[this.end])) = t;
-		this.end = (this.end + T.sizeof) % Size;
+		this.end = (this.end + T.sizeof) % (Size * T.sizeof);
 	}
 
 	/// Ditto
@@ -141,7 +141,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		assert(this.length + 1 < Size);
 
 		emplace(cast(T*)(&this.store[this.end]), args);
-		this.end = (this.end + 1) % Size;
+		this.end = (this.end + T.sizeof) % (Size * T.sizeof);
 	}
 
 	pragma(inline, true)
@@ -154,9 +154,9 @@ struct FixedSizeArray(T,size_t Size = 32) {
 			}
 		}
 
-		--this.end;
+		this.end = this.end - T.sizeof;
 		if(this.end < 0) {
-			this.end = Size - 1;
+			this.end = Size - T.sizeof;
 		}
 	}
 
@@ -268,9 +268,9 @@ struct FixedSizeArray(T,size_t Size = 32) {
 			return 0UL;
 		}
 		if(this.end > this.begin) {
-			return (this.end - this.begin) / 4;
+			return (this.end - this.begin) / T.sizeof;
 		} else {
-			return this.end / 4 + (Size - this.begin) / 4;
+			return (this.end / T.sizeof) + ((Size - this.begin) / T.sizeof);
 		}
 	}
 
@@ -323,7 +323,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 
 	pragma(inline, true)
 	auto opCast(S)() {
-		return cast(S)(this.store[0 .. this.length]);
+		return cast(S)(this.store[this.begin .. this.end]);
 	}
 
 	///
@@ -341,6 +341,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 
 unittest {
 	import exceptionhandling;
+	import std.stdio;
 
 	FixedSizeArray!(int, 16) fsa;
 	assert(fsa.empty);
@@ -365,6 +366,7 @@ unittest {
 	cast(void)assertEqual(fsa.back, 2);
 
 	fsa.removeBack();
+	//writefln("%s %s", fsa.begin, fsa.end);
 	assert(fsa.empty);
 	cast(void)assertEqual(fsa.length, 0);
 }
@@ -415,98 +417,103 @@ pure nothrow unittest {
 
 unittest {
 	import std.traits;
+	import std.meta;
 	import std.range;
-	FixedSizeArray!(int,16) fsa;
-	static assert(isInputRange!(typeof(fsa[])));
-	static assert(isForwardRange!(typeof(fsa[])));
-	static assert(isBidirectionalRange!(typeof(fsa[])));
-	foreach(it; [[0], [0,1,2,3,4], [2,3,6,5,6,2123,9,36,6123,624565345]]) {
-		foreach(jdx, jt; it) {
-			fsa.insertBack(jt);
-			cast(void)assertEqual(fsa.length, jdx + 1);
-			foreach(kdx, kt; it[0 .. jdx]) {
-				assertEqual(fsa[kdx], kt);
-			}
-
-			{
-				auto forward = fsa[];
-				auto forward2 = forward;
-				cast(void)assertEqual(forward.length, jdx + 1);
-				for(size_t i = 0; i < forward.length; ++i) {
-					cast(void)assertEqual(forward[i], it[i]);
-					cast(void)assertEqual(forward2.front, it[i]);
-					forward2.popFront();
+	import std.stdio;
+	foreach(Type; AliasSeq!(byte,int,long)) {
+		FixedSizeArray!(Type,16) fsa2;
+		static assert(isInputRange!(typeof(fsa2[])));
+		static assert(isForwardRange!(typeof(fsa2[])));
+		static assert(isBidirectionalRange!(typeof(fsa2[])));
+		foreach(idx, it; [[0], [0,1,2,3,4], [2,3,6,5,6,21,9,36,61,62]]) {
+			FixedSizeArray!(Type,16) fsa;
+			foreach(jdx, jt; it) {
+				fsa.insertBack(jt);
+				//writefln("%s idx %d jdx %d length %d", Type.stringof, idx, jdx, fsa.length);
+				cast(void)assertEqual(fsa.length, jdx + 1);
+				foreach(kdx, kt; it[0 .. jdx]) {
+					assertEqual(fsa[kdx], kt);
 				}
-				assert(forward2.empty);
 
-				auto backward = fsa[];
-				auto backward2 = backward.save;
-				cast(void)assertEqual(backward.length, jdx + 1);
-				for(size_t i = 0; i < backward.length; ++i) {
-					cast(void)assertEqual(backward[backward.length - i - 1],
-							it[jdx - i]
-					);
+				{
+					auto forward = fsa[];
+					auto forward2 = forward;
+					cast(void)assertEqual(forward.length, jdx + 1);
+					for(size_t i = 0; i < forward.length; ++i) {
+						cast(void)assertEqual(forward[i], it[i]);
+						cast(void)assertEqual(forward2.front, it[i]);
+						forward2.popFront();
+					}
+					assert(forward2.empty);
 
-					cast(void)assertEqual(backward2.back, 
-							it[0 .. jdx + 1 - i].back
-					);
-					backward2.popBack();
+					auto backward = fsa[];
+					auto backward2 = backward.save;
+					cast(void)assertEqual(backward.length, jdx + 1);
+					for(size_t i = 0; i < backward.length; ++i) {
+						cast(void)assertEqual(backward[backward.length - i - 1],
+								it[jdx - i]
+						);
+
+						cast(void)assertEqual(backward2.back, 
+								it[0 .. jdx + 1 - i].back
+						);
+						backward2.popBack();
+					}
+					assert(backward2.empty);
+					auto forward3 = fsa[].save;
+					auto forward4 = fsa[0 .. jdx + 1];
+
+					while(!forward3.empty && !forward4.empty) {
+						cast(void)assertEqual(forward3.front, forward4.front);
+						cast(void)assertEqual(forward3.back, forward4.back);
+						forward3.popFront();
+						forward4.popFront();
+					}
+					assert(forward3.empty);
+					assert(forward4.empty);
 				}
-				assert(backward2.empty);
-				auto forward3 = fsa[].save;
-				auto forward4 = fsa[0 .. jdx + 1];
 
-				while(!forward3.empty && !forward4.empty) {
-					cast(void)assertEqual(forward3.front, forward4.front);
-					cast(void)assertEqual(forward3.back, forward4.back);
-					forward3.popFront();
-					forward4.popFront();
+				{
+					const(FixedSizeArray!(Type,16))* constFsa;
+					constFsa = &fsa;
+					auto forward = (*constFsa)[];
+					auto forward2 = forward.save;
+					cast(void)assertEqual(forward.length, jdx + 1);
+					for(size_t i = 0; i < forward.length; ++i) {
+						cast(void)assertEqual(cast(int)forward[i], it[i]);
+						cast(void)assertEqual(cast(int)forward2.front, it[i]);
+						forward2.popFront();
+					}
+					assert(forward2.empty);
+
+					auto backward = (*constFsa)[];
+					auto backward2 = backward.save;
+					cast(void)assertEqual(backward.length, jdx + 1);
+					for(size_t i = 0; i < backward.length; ++i) {
+						cast(void)assertEqual(backward[backward.length - i - 1],
+								it[jdx - i]
+						);
+
+						cast(void)assertEqual(backward2.back, 
+								it[0 .. jdx + 1 - i].back
+						);
+						backward2.popBack();
+					}
+					assert(backward2.empty);
+					auto forward3 = (*constFsa)[];
+					auto forward4 = (*constFsa)[0 .. jdx + 1];
+
+					while(!forward3.empty && !forward4.empty) {
+						cast(void)assertEqual(forward3.front, forward4.front);
+						cast(void)assertEqual(forward3.back, forward4.back);
+						forward3.popFront();
+						forward4.popFront();
+					}
+					assert(forward3.empty);
+					assert(forward4.empty);
 				}
-				assert(forward3.empty);
-				assert(forward4.empty);
-			}
-
-			{
-				const(FixedSizeArray!(int,16))* constFsa;
-				constFsa = &fsa;
-				auto forward = (*constFsa)[];
-				auto forward2 = forward.save;
-				cast(void)assertEqual(forward.length, jdx + 1);
-				for(size_t i = 0; i < forward.length; ++i) {
-					cast(void)assertEqual(cast(int)forward[i], it[i]);
-					cast(void)assertEqual(cast(int)forward2.front, it[i]);
-					forward2.popFront();
-				}
-				assert(forward2.empty);
-
-				auto backward = (*constFsa)[];
-				auto backward2 = backward.save;
-				cast(void)assertEqual(backward.length, jdx + 1);
-				for(size_t i = 0; i < backward.length; ++i) {
-					cast(void)assertEqual(backward[backward.length - i - 1],
-							it[jdx - i]
-					);
-
-					cast(void)assertEqual(backward2.back, 
-							it[0 .. jdx + 1 - i].back
-					);
-					backward2.popBack();
-				}
-				assert(backward2.empty);
-				auto forward3 = (*constFsa)[];
-				auto forward4 = (*constFsa)[0 .. jdx + 1];
-
-				while(!forward3.empty && !forward4.empty) {
-					cast(void)assertEqual(forward3.front, forward4.front);
-					cast(void)assertEqual(forward3.back, forward4.back);
-					forward3.popFront();
-					forward4.popFront();
-				}
-				assert(forward3.empty);
-				assert(forward4.empty);
 			}
 		}
-		fsa.removeAll();
 	}
 }
 
