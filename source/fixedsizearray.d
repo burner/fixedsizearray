@@ -73,13 +73,22 @@ struct FixedSizeArraySlice(FSA,T, size_t Size) {
 
 struct FixedSizeArray(T,size_t Size = 32) {
 	import std.traits;
-	size_t len;
+	long begin;
+	long end;
+
+	/** If `true` no destructor of any element stored in the FixedSizeArray
+	  will be called.
+	*/
+	bool disableDtor;
+
 	byte[T.sizeof * Size] store;
 
 	pragma(inline, true)
 	~this() {
 		static if(hasElaborateDestructor!T) {
-			this.removeAll();
+			if(!this.disableDtor) {
+				this.removeAll();
+			}
 		}
 	}
 
@@ -87,10 +96,10 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	void insertBack(S)(auto ref S t) @trusted if(is(Unqual!(S) == T)) {
 		import std.conv : emplace;
 		import std.stdio;
-		assert(this.len + 1 < Size);
+		assert(this.length + 1 < Size);
 
-		*(cast(T*)(&this.store[this.len * T.sizeof])) = t;
-		++this.len;
+		*(cast(T*)(&this.store[this.end])) = t;
+		this.end = (this.end + T.sizeof) % Size;
 	}
 
 	/// Ditto
@@ -112,7 +121,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
             Unqual!T[T.sizeof == 1 ? 4 : 2] encoded;
             auto len = encode(encoded, s);
 			foreach(T it; encoded[0 .. len]) {
-				this.insertBack!T(it);
+				 this.insertBack!T(it);
 			}
         } else {
 			static assert(false);
@@ -129,22 +138,41 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	pragma(inline, true)
 	void emplaceBack(Args...)(auto ref Args args) {
 		import std.conv : emplace;
-		assert(this.len + 1 < Size);
+		assert(this.length + 1 < Size);
 
-		emplace(cast(T*)(&this.store[this.len * T.sizeof]), args);
-		++this.len;
+		emplace(cast(T*)(&this.store[this.end]), args);
+		this.end = (this.end + 1) % Size;
 	}
 
 	pragma(inline, true)
 	void removeBack() {
-		assert(this.len > 0);
+		assert(!this.empty);
 
 		static if(hasElaborateDestructor!T) {
-			this.back().__dtor();
+			if(!this.disableDtor) {
+				this.back().__dtor();
+			}
 		}
 
-		--this.len;
+		--this.end;
+		if(this.end < 0) {
+			this.end = Size - 1;
+		}
 	}
+
+	pragma(inline, true)
+	void removeFront() {
+		assert(!this.empty);
+
+		static if(hasElaborateDestructor!T) {
+			if(!this.disableDtor) {
+				this.front().__dtor();
+			}
+		}
+
+		this.begin = (this.begin + T.sizeof) % Size;
+	}
+
 
 	unittest {
 		FixedSizeArray!(int,32) fsa;
@@ -178,16 +206,25 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	}
 
 	pragma(inline, true)
+	long backPos() const @safe pure nothrow @nogc {
+		if(this.end == 0) {
+			return Size - T.sizeof;
+		} else {
+			return this.end - T.sizeof;
+		}
+	}
+
+	pragma(inline, true)
 	@property ref T back() @trusted {
-		assert(this.len > 0);
-		return *(cast(T*)(&this.store[(this.len - 1) * T.sizeof]));
+		assert(!this.empty);
+		return *(cast(T*)(&this.store[this.backPos]));
 	}
 
 	/// Ditto
 	pragma(inline, true)
 	@property ref T front() @trusted {
-		assert(this.len > 0);
-		return *(cast(T*)(this.store.ptr));
+		assert(!this.empty);
+		return *(cast(T*)(&this.store[this.begin]));
 	}
 
 	///
@@ -203,14 +240,14 @@ struct FixedSizeArray(T,size_t Size = 32) {
 
 	pragma(inline, true)
 	ref T opIndex(const size_t idx) @trusted {
-		cast(void)assertLess(idx,  this.len);
+		cast(void)assertLess(idx,  this.length);
 		return *(cast(T*)(&this.store[idx * T.sizeof]));
 	}
 
 	/// Ditto
 	pragma(inline, true)
 	ref const(T) opIndex(const size_t idx) @trusted const {
-		cast(void)assertLess(idx,  this.len);
+		cast(void)assertLess(idx,  this.length);
 		return *(cast(const(T)*)(&this.store[idx * T.sizeof]));
 	}
 
@@ -227,13 +264,20 @@ struct FixedSizeArray(T,size_t Size = 32) {
 
 	pragma(inline, true)
 	@property size_t length() const pure @nogc nothrow {
-		return this.len;
+		if(this.end == this.begin) {
+			return 0UL;
+		}
+		if(this.end > this.begin) {
+			return (this.end - this.begin) / 4;
+		} else {
+			return this.end / 4 + (Size - this.begin) / 4;
+		}
 	}
 
 	/// Ditto
 	pragma(inline, true)
 	@property size_t empty() const pure @nogc nothrow {
-		return this.len == 0UL;
+		return this.begin == this.end;
 	}
 
 	///
@@ -252,7 +296,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	pragma(inline, true)
 	auto opSlice() pure @nogc @safe nothrow {
 		return FixedSizeArraySlice!(typeof(this),T,Size)(&this, cast(short)0, 
-				cast(short)this.len
+				cast(short)this.length
 		);
 	}
 	
@@ -266,7 +310,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	pragma(inline, true)
 	auto opSlice() pure @nogc @safe nothrow const {
 		return FixedSizeArraySlice!(typeof(this),const(T),Size)
-			(&this, cast(short)0, cast(short)this.len);
+			(&this, cast(short)0, cast(short)this.length);
 	}
 	
 	pragma(inline, true)
@@ -279,7 +323,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 
 	pragma(inline, true)
 	auto opCast(S)() {
-		return cast(S)(this.store[0 .. this.len]);
+		return cast(S)(this.store[0 .. this.length]);
 	}
 
 	///
@@ -293,6 +337,36 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	
 		assert(cast(string)fsa == h);
 	}
+}
+
+unittest {
+	import exceptionhandling;
+
+	FixedSizeArray!(int, 16) fsa;
+	assert(fsa.empty);
+	cast(void)assertEqual(fsa.length, 0);
+
+	fsa.insertBack(1);
+	assert(!fsa.empty);
+	cast(void)assertEqual(fsa.length, 1);
+	cast(void)assertEqual(fsa.front, 1);
+	cast(void)assertEqual(fsa.back, 1);
+
+	fsa.insertBack(2);
+	assert(!fsa.empty);
+	cast(void)assertEqual(fsa.length, 2);
+	cast(void)assertEqual(fsa.front, 1);
+	cast(void)assertEqual(fsa.back, 2);
+
+	fsa.removeFront();
+	assert(!fsa.empty);
+	cast(void)assertEqual(fsa.length, 1);
+	cast(void)assertEqual(fsa.front, 2);
+	cast(void)assertEqual(fsa.back, 2);
+
+	fsa.removeBack();
+	assert(fsa.empty);
+	cast(void)assertEqual(fsa.length, 0);
 }
 
 unittest {
