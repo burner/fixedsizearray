@@ -90,7 +90,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		import std.stdio;
 		assert(this.len + 1 < Size);
 
-		emplace(cast(T*)(&this.store[this.len * T.sizeof]), t);
+		*(cast(T*)(&this.store[this.len * T.sizeof])) = t;
 		++this.len;
 	}
 
@@ -116,7 +116,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 				this.insertBack!T(it);
 			}
         } else {
-			assert(false);
+			static assert(false);
 		}
 	}
 
