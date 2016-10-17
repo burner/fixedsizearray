@@ -136,6 +136,39 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	}
 
 	pragma(inline, true)
+	void insertFront(S)(auto ref S t) @trusted if(is(Unqual!(S) == T)) {
+		import std.conv : emplace;
+		import std.stdio;
+		assert(this.length + 1 < Size);
+
+		this.begin = (this.begin - T.sizeof);
+		if(this.begin < 0) {
+			this.begin = (T.sizeof * Size) - T.sizeof;
+		}
+
+		*(cast(T*)(&this.store[this.begin])) = t;
+	}
+
+	unittest {
+		FixedSizeArray!(int,32) fsa;
+		fsa.insertFront(1337);
+		assert(fsa.length == 1);
+		assert(fsa[0] == 1337);
+		assert(fsa.front == 1337);
+		assert(fsa.back == 1337);
+
+		fsa.removeBack();
+		assert(fsa.length == 0);
+		assert(fsa.empty == 0);
+		fsa.insertFront(1336);
+
+		assert(fsa.length == 1);
+		assert(fsa[0] == 1336);
+		assert(fsa.front == 1336);
+		assert(fsa.back == 1336);
+	}
+
+	pragma(inline, true)
 	void emplaceBack(Args...)(auto ref Args args) {
 		import std.conv : emplace;
 		assert(this.length + 1 < Size);
@@ -156,7 +189,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 
 		this.end = this.end - T.sizeof;
 		if(this.end < 0) {
-			this.end = Size - T.sizeof;
+			this.end = (Size * T.sizeof) - T.sizeof;
 		}
 	}
 
@@ -207,7 +240,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	pragma(inline, true)
 	long backPos() const @safe pure nothrow @nogc {
 		if(this.end == 0) {
-			return Size - T.sizeof;
+			return (Size * T.sizeof) - T.sizeof;
 		} else {
 			return this.end - T.sizeof;
 		}
@@ -216,7 +249,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	pragma(inline, true)
 	@property ref T back() @trusted {
 		assert(!this.empty);
-		return *(cast(T*)(&this.store[this.backPos]));
+		return *(cast(T*)(&this.store[this.backPos()]));
 	}
 
 	/// Ditto
@@ -240,14 +273,14 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	pragma(inline, true)
 	ref T opIndex(const size_t idx) @trusted {
 		cast(void)assertLess(idx,  this.length);
-		return *(cast(T*)(&this.store[idx * T.sizeof]));
+		return *(cast(T*)(&this.store[(this.begin + (idx * T.sizeof)) % (Size * T.sizeof)]));
 	}
 
 	/// Ditto
 	pragma(inline, true)
 	ref const(T) opIndex(const size_t idx) @trusted const {
 		cast(void)assertLess(idx,  this.length);
-		return *(cast(const(T)*)(&this.store[idx * T.sizeof]));
+		return *(cast(const(T)*)(&this.store[(this.begin + (idx * T.sizeof)) % (Size * T.sizeof)]));
 	}
 
 	///
@@ -269,7 +302,10 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		if(this.end > this.begin) {
 			return (this.end - this.begin) / T.sizeof;
 		} else {
-			return (this.end / T.sizeof) + ((Size - this.begin) / T.sizeof);
+			//return (this.end / T.sizeof) + ((Size - this.begin) / T.sizeof);
+			const a = (this.end / T.sizeof);
+			const b = ((Size * T.sizeof) - this.begin) / T.sizeof;
+			return a + b;
 		}
 	}
 
