@@ -170,9 +170,8 @@ struct FixedSizeArray(T,size_t Size = 32) {
 			}
 		}
 
-		this.begin = (this.begin + T.sizeof) % Size;
+		this.begin = (this.begin + T.sizeof) % (Size * T.sizeof);
 	}
-
 
 	unittest {
 		FixedSizeArray!(int,32) fsa;
