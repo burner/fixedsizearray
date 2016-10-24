@@ -168,6 +168,62 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		assert(fsa.back == 1336);
 	}
 
+	unittest {
+		FixedSizeArray!(int,16) fsa;
+		for(int i = 0; i < 32; ++i) {
+			fsa.insertFront(i);
+			assert(fsa.length == 1);
+			assert(!fsa.empty);
+			assert(fsa.front == i);
+			assert(fsa.back == i);
+			fsa.removeFront();
+			assert(fsa.length == 0);
+			assert(fsa.empty);
+		}
+	}
+
+	unittest {
+		FixedSizeArray!(int,16) fsa;
+		for(int i = 0; i < 32; ++i) {
+			fsa.insertFront(i);
+			assert(fsa.length == 1);
+			assert(!fsa.empty);
+			assert(fsa.front == i);
+			assert(fsa.back == i);
+			fsa.removeBack();
+			assert(fsa.length == 0);
+			assert(fsa.empty);
+		}
+	}
+
+	unittest {
+		FixedSizeArray!(int,16) fsa;
+		for(int i = 0; i < 32; ++i) {
+			fsa.insertBack(i);
+			assert(fsa.length == 1);
+			assert(!fsa.empty);
+			assert(fsa.front == i);
+			assert(fsa.back == i);
+			fsa.removeFront();
+			assert(fsa.length == 0);
+			assert(fsa.empty);
+		}
+	}
+
+	unittest {
+		FixedSizeArray!(int,16) fsa;
+		for(int i = 0; i < 32; ++i) {
+			fsa.insertFront(i);
+			assert(fsa.length == 1);
+			assert(!fsa.empty);
+			assert(fsa.front == i);
+			assert(fsa.back == i);
+			fsa.removeBack();
+			assert(fsa.length == 0);
+			assert(fsa.empty);
+		}
+	}
+
 	pragma(inline, true)
 	void emplaceBack(Args...)(auto ref Args args) {
 		import std.conv : emplace;
