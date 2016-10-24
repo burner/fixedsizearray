@@ -159,7 +159,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 
 		fsa.removeBack();
 		assert(fsa.length == 0);
-		assert(fsa.empty == 0);
+		assert(fsa.empty);
 		fsa.insertFront(1336);
 
 		assert(fsa.length == 1);
