@@ -31,7 +31,17 @@ struct FixedSizeArraySlice(FSA,T, size_t Size) {
 	}
 
 	pragma(inline, true)
+	@property ref const(T) front() const {
+		return (*this.fsa)[this.low];
+	}
+
+	pragma(inline, true)
 	@property ref T back() {
+		return (*this.fsa)[this.high - 1];
+	}
+
+	pragma(inline, true)
+	@property ref const(T) back() const {
 		return (*this.fsa)[this.high - 1];
 	}
 
@@ -81,6 +91,14 @@ struct FixedSizeArray(T,size_t Size = 32) {
 
 	byte[T.sizeof * Size] store;
 
+	this(Args...)(Args args) {
+		foreach(it; args) {
+			static if(isAssignable!(T,typeof(it))) {
+				this.insertBack(it);
+			}
+		}
+	}
+
 	pragma(inline, true)
 	~this() {
 		static if(hasElaborateDestructor!T) {
@@ -88,6 +106,10 @@ struct FixedSizeArray(T,size_t Size = 32) {
 				this.removeAll();
 			}
 		}
+	}
+
+	size_t capacity() const @nogc @safe pure nothrow {
+		return Size;
 	}
 
 	/** This function inserts an `S` element at the back if there is space.
@@ -124,7 +146,10 @@ struct FixedSizeArray(T,size_t Size = 32) {
 			foreach(T it; encoded[0 .. len]) {
 				 this.insertBack!T(it);
 			}
-        } else {
+        } else static if(isAssignable!(T,S)) {
+			*(cast(T*)(&this.store[this.end])) = s;
+			this.end = (this.end + T.sizeof) % (Size * T.sizeof);
+		} else {
 			static assert(false);
 		}
 	}
@@ -249,7 +274,13 @@ struct FixedSizeArray(T,size_t Size = 32) {
 
 		static if(hasElaborateDestructor!T) {
 			if(!this.disableDtor) {
-				this.back().__dtor();
+				static if(hasMember!(T, "__dtor")) {
+					this.back().__dtor();
+				} else static if(hasMember!(T, "__xdtor")) {
+					this.back().__xdtor();
+				} else {
+					static assert(false);
+				}
 			}
 		}
 
@@ -267,7 +298,13 @@ struct FixedSizeArray(T,size_t Size = 32) {
 
 		static if(hasElaborateDestructor!T) {
 			if(!this.disableDtor) {
-				this.front().__dtor();
+				static if(hasMember!(T, "__dtor")) {
+					this.back().__dtor();
+				} else static if(hasMember!(T, "__xdtor")) {
+					this.back().__xdtor();
+				} else {
+					static assert(false);
+				}
 			}
 		}
 
@@ -324,9 +361,21 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		return *(cast(T*)(&this.store[this.backPos()]));
 	}
 
+	pragma(inline, true)
+	@property ref const(T) back() const @trusted {
+		assert(!this.empty);
+		return *(cast(T*)(&this.store[this.backPos()]));
+	}
+
 	/// Ditto
 	pragma(inline, true)
 	@property ref T front() @trusted {
+		assert(!this.empty);
+		return *(cast(T*)(&this.store[this.begin]));
+	}
+
+	pragma(inline, true)
+	@property ref const(T) front() const @trusted {
 		assert(!this.empty);
 		return *(cast(T*)(&this.store[this.begin]));
 	}
