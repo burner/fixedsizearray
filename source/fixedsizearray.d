@@ -344,6 +344,55 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		assert(fsa.empty);
 	}
 
+	void remove(ulong idx) {
+		import std.stdio;
+		if(idx == 0) {
+			this.removeFront();
+		} else if(idx == this.length - 1) {
+			this.removeBack();
+		} else {
+			for(long i = idx + 1; i < this.length; ++i) {
+				this[i - 1] = this[i];
+			}
+			this.removeBack();
+		}
+	}
+
+	unittest {
+		FixedSizeArray!(int,16) fsa;
+		foreach(i; 0..10) {
+			fsa.insertBack(i);
+		}
+		fsa.remove(1);
+		foreach(idx, i; [0,2,3,4,5,6,7,8,9]) {
+			assert(fsa[idx] == i);
+		}
+		fsa.remove(0);
+		foreach(idx, i; [2,3,4,5,6,7,8,9]) {
+			assert(fsa[idx] == i);
+		}
+		fsa.remove(7);
+		foreach(idx, i; [2,3,4,5,6,7,8]) {
+			assert(fsa[idx] == i);
+		}
+		fsa.remove(5);
+		foreach(idx, i; [2,3,4,5,6,8]) {
+			assert(fsa[idx] == i);
+		}
+		fsa.remove(1);
+		foreach(idx, i; [2,4,5,6,8]) {
+			assert(fsa[idx] == i);
+		}
+		fsa.remove(0);
+		foreach(idx, i; [4,5,6,8]) {
+			assert(fsa[idx] == i);
+		}
+		fsa.remove(0);
+		foreach(idx, i; [5,6,8]) {
+			assert(fsa[idx] == i);
+		}
+	}
+
 	pragma(inline, true)
 	long backPos() const @safe pure nothrow @nogc {
 		if(this.end == 0) {
