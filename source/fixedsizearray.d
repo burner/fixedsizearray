@@ -91,6 +91,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 
 	byte[T.sizeof * Size] store;
 
+	pragma(inline, true)
 	this(Args...)(Args args) {
 		foreach(it; args) {
 			static if(isAssignable!(T,typeof(it))) {
@@ -108,6 +109,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		}
 	}
 
+	pragma(inline, true)
 	size_t capacity() const @nogc @safe pure nothrow {
 		return Size;
 	}
@@ -344,6 +346,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		assert(fsa.empty);
 	}
 
+	pragma(inline, true)
 	void remove(ulong idx) {
 		import std.stdio;
 		if(idx == 0) {
