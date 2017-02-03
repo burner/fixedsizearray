@@ -785,3 +785,20 @@ unittest {
 		assert(cast(string)fsa == s);
 	}
 }
+
+unittest {
+	enum size = 128;
+	auto arrays = new FixedSizeArray!(Object, size * Object.sizeof)[size];
+	foreach (i; 0..size) {
+	    foreach (j; 0..size) {
+	        arrays[i].insertBack(new Object);
+	    }
+	}
+	bool[Object] o;
+	foreach (i; 0..size) {
+	    foreach (j; 0..size) {
+	        o[arrays[i][j]] = true;
+	    }
+	}
+	assert(size * size == o.length);
+}
