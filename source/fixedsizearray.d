@@ -447,7 +447,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	*/
 	pragma(inline, true)
 	ref T opIndex(const size_t idx) @trusted {
-		assert(idx < this.length);
+		assert(idx <= this.length);
 		return *(cast(T*)(&this.store[
 				(this.begin + (idx * T.sizeof)) % (Size * T.sizeof)
 		]));
@@ -456,7 +456,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	/// Ditto
 	pragma(inline, true)
 	ref const(T) opIndex(const size_t idx) @trusted const {
-		assert(idx < this.length);
+		assert(idx <= this.length);
 		return *(cast(const(T)*)(&this.store[
 				(this.begin + (idx * T.sizeof)) % (Size * T.sizeof)
 		]));
@@ -795,16 +795,23 @@ unittest {
 unittest {
 	import std.stdio;
 	enum size = 256;
-	auto arrays = new FixedSizeArray!(Object, size)[size];
+	//auto arrays = new FixedSizeArray!(Object, size)[size];
+	FixedSizeArray!(Object, size)[size] arrays;
 	foreach (i; 0..size) {
 	    foreach (j; 0..size) {
+			writefln("%d %d %d", i, j, arrays[i].length);
 	        arrays[i].insertBack(new Object);
 	    }
 	}
+	foreach(ref it; arrays) {
+		writef("%d ", it.length);
+	}
+	writeln();
 	bool[Object] o;
 	foreach (i; 0..size) {
 	    foreach (j; 0..size) {
-			assert(arrays[i][j] !in o);
+			//assert(arrays[i][j] !in o);
+			writefln("%d %d %d", i, j, arrays[i].length);
 	        o[arrays[i][j]] = true;
 	    }
 	}
