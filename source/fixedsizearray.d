@@ -121,7 +121,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	void insertBack(S)(auto ref S t) @trusted if(is(Unqual!(S) == T)) {
 		import std.conv : emplace;
 		import std.stdio;
-		assert(this.length + 1 < Size);
+		assert(this.length + 1 <= Size);
 
 		*(cast(T*)(&this.store[this.end])) = t;
 		this.end = (this.end + T.sizeof) % (Size * T.sizeof);
@@ -171,7 +171,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	void insertFront(S)(auto ref S t) @trusted if(is(Unqual!(S) == T)) {
 		import std.conv : emplace;
 		import std.stdio;
-		assert(this.length + 1 < Size);
+		assert(this.length + 1 <= Size);
 
 		this.begin = (this.begin - T.sizeof);
 		if(this.begin < 0) {
@@ -262,7 +262,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	pragma(inline, true)
 	void emplaceBack(Args...)(auto ref Args args) {
 		import std.conv : emplace;
-		assert(this.length + 1 < Size);
+		assert(this.length + 1 <= Size);
 
 		emplace(cast(T*)(&this.store[this.end]), args);
 		this.end = (this.end + T.sizeof) % (Size * T.sizeof);
@@ -787,8 +787,15 @@ unittest {
 }
 
 unittest {
-	enum size = 128;
-	auto arrays = new FixedSizeArray!(Object, size * Object.sizeof)[size];
+	FixedSizeArray!(int,2) fsa;
+	fsa.insertBack(0);
+	fsa.insertBack(1);
+}
+
+unittest {
+	import std.stdio;
+	enum size = 256;
+	auto arrays = new FixedSizeArray!(Object, size)[size];
 	foreach (i; 0..size) {
 	    foreach (j; 0..size) {
 	        arrays[i].insertBack(new Object);
@@ -797,6 +804,7 @@ unittest {
 	bool[Object] o;
 	foreach (i; 0..size) {
 	    foreach (j; 0..size) {
+			assert(arrays[i][j] !in o);
 	        o[arrays[i][j]] = true;
 	    }
 	}
