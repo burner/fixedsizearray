@@ -81,8 +81,8 @@ struct FixedSizeArraySlice(FSA,T, size_t Size) {
 
 struct FixedSizeArray(T,size_t Size = 32) {
 	import std.traits;
-	long begin;
-	long end;
+	long base;
+	long length_;
 
 	/** If `true` no destructor of any element stored in the FixedSizeArray
 	  will be called.
@@ -123,8 +123,8 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		import std.stdio;
 		assert(this.length + 1 <= Size);
 
-		*(cast(T*)(&this.store[this.end])) = t;
-		this.end = (this.end + T.sizeof) % (Size * T.sizeof);
+		*(cast(T*)(&this.store[(this.base + this.length_) % Size])) = t;
+		this.length_ += T.sizeof;
 	}
 
 	/// Ditto
@@ -149,15 +149,15 @@ struct FixedSizeArray(T,size_t Size = 32) {
 				 this.insertBack!T(it);
 			}
         } else static if(isAssignable!(T,S)) {
-			*(cast(T*)(&this.store[this.end])) = s;
-			this.end = (this.end + T.sizeof) % (Size * T.sizeof);
+			*(cast(T*)(&this.store[(this.base + this.length_) % Size])) = s;
+			this.length_ += T.sizeof;
 		} else {
 			static assert(false);
 		}
 	}
 
 	///
-	pure @safe nothrow unittest {
+	pure @safe unittest {
 		FixedSizeArray!(int,32) fsa;
 		fsa.insertBack(1337);
 		assert(fsa.length == 1);
@@ -173,15 +173,15 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		import std.stdio;
 		assert(this.length + 1 <= Size);
 
-		this.begin = (this.begin - T.sizeof);
-		if(this.begin < 0) {
-			this.begin = (T.sizeof * Size) - T.sizeof;
+		this.base -= T.sizeof;
+		if(this.base < 0) {
+			this.base = (T.sizeof * Size) - T.sizeof;
 		}
 
-		*(cast(T*)(&this.store[this.begin])) = t;
+		*(cast(T*)(&this.store[this.base])) = t;
 	}
 
-	pure @safe nothrow unittest {
+	pure @safe unittest {
 		FixedSizeArray!(int,32) fsa;
 		fsa.insertFront(1337);
 		assert(fsa.length == 1);
@@ -200,7 +200,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		assert(fsa.back == 1336);
 	}
 
-	pure @safe nothrow unittest {
+	pure @safe unittest {
 		FixedSizeArray!(int,16) fsa;
 		for(int i = 0; i < 32; ++i) {
 			fsa.insertFront(i);
@@ -214,7 +214,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		}
 	}
 
-	pure @safe nothrow unittest {
+	pure @safe unittest {
 		FixedSizeArray!(int,16) fsa;
 		for(int i = 0; i < 32; ++i) {
 			fsa.insertFront(i);
@@ -264,8 +264,8 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		import std.conv : emplace;
 		assert(this.length + 1 <= Size);
 
-		emplace(cast(T*)(&this.store[this.end]), args);
-		this.end = (this.end + T.sizeof) % (Size * T.sizeof);
+		emplace(cast(T*)(&this.store[(this.base + this.length_) % Size]), args);
+		this.length_ += T.sizeof;
 	}
 
 	/** This function removes an element form the back of the array.
@@ -286,10 +286,12 @@ struct FixedSizeArray(T,size_t Size = 32) {
 			}
 		}
 
-		this.end = this.end - T.sizeof;
-		if(this.end < 0) {
-			this.end = (Size * T.sizeof) - T.sizeof;
-		}
+		//this.end = this.end - T.sizeof;
+		//if(this.end < 0) {
+		//	this.end = (Size * T.sizeof) - T.sizeof;
+		//}
+
+		this.length_ -= T.sizeof;
 	}
 
 	/** This function removes an element form the front of the array.
@@ -310,10 +312,15 @@ struct FixedSizeArray(T,size_t Size = 32) {
 			}
 		}
 
-		this.begin = (this.begin + T.sizeof) % (Size * T.sizeof);
+		//this.begin = (this.begin + T.sizeof) % (Size * T.sizeof);
+		this.base += T.sizeof;
+		if(this.base > Size) {
+			this.base = 0;
+		}
+		this.length_ -= T.sizeof;
 	}
 
-	pure @safe nothrow unittest {
+	pure @safe unittest {
 		FixedSizeArray!(int,32) fsa;
 		fsa.insertBack(1337);
 		assert(fsa.length == 1);
@@ -333,7 +340,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		}
 	}
 
-	pure @safe nothrow unittest {
+	pure @safe unittest {
 		FixedSizeArray!(int,32) fsa;
 		fsa.insertBack(1337);
 		fsa.insertBack(1338);
@@ -396,44 +403,35 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		}
 	}
 
-	pragma(inline, true)
-	long backPos() const @safe pure nothrow @nogc {
-		if(this.end == 0) {
-			return (Size * T.sizeof) - T.sizeof;
-		} else {
-			return this.end - T.sizeof;
-		}
-	}
-
 	/** Access the last or the first element of the array.
 	*/
 	pragma(inline, true)
 	@property ref T back() @trusted {
 		assert(!this.empty);
-		return *(cast(T*)(&this.store[this.backPos()]));
+		return *(cast(T*)(&this.store[this.base + this.length_ - T.sizeof]));
 	}
 
 	pragma(inline, true)
 	@property ref const(T) back() const @trusted {
 		assert(!this.empty);
-		return *(cast(T*)(&this.store[this.backPos()]));
+		return *(cast(T*)(&this.store[this.base + this.length_ - T.sizeof]));
 	}
 
 	/// Ditto
 	pragma(inline, true)
 	@property ref T front() @trusted {
 		assert(!this.empty);
-		return *(cast(T*)(&this.store[this.begin]));
+		return *(cast(T*)(&this.store[this.base]));
 	}
 
 	pragma(inline, true)
 	@property ref const(T) front() const @trusted {
 		assert(!this.empty);
-		return *(cast(T*)(&this.store[this.begin]));
+		return *(cast(T*)(&this.store[this.base]));
 	}
 
 	///
-	pure @safe nothrow unittest {
+	pure @safe unittest {
 		FixedSizeArray!(int,32) fsa;
 		fsa.insertBack(1337);
 		fsa.insertBack(1338);
@@ -447,23 +445,25 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	*/
 	pragma(inline, true)
 	ref T opIndex(const size_t idx) @trusted {
-		assert(idx <= this.length);
+		import std.format : format;
+		assert(idx <= this.length, format("%s %s", idx, this.length));
 		return *(cast(T*)(&this.store[
-				(this.begin + (idx * T.sizeof)) % (Size * T.sizeof)
+				(this.base + this.length_) % Size
 		]));
 	}
 
 	/// Ditto
 	pragma(inline, true)
 	ref const(T) opIndex(const size_t idx) @trusted const {
-		assert(idx <= this.length);
+		import std.format : format;
+		assert(idx <= this.length, format("%s %s", idx, this.length));
 		return *(cast(const(T)*)(&this.store[
-				(this.begin + (idx * T.sizeof)) % (Size * T.sizeof)
+				(this.base + this.length_) % Size
 		]));
 	}
 
 	///
-	pure @safe nothrow unittest {
+	pure @safe unittest {
 		FixedSizeArray!(int,32) fsa;
 		fsa.insertBack(1337);
 		fsa.insertBack(1338);
@@ -476,22 +476,24 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	/// Gives the length of the array.
 	pragma(inline, true)
 	@property size_t length() const pure @nogc nothrow {
-		if(this.end == this.begin) {
-			return 0UL;
-		}
-		if(this.end > this.begin) {
-			return (this.end - this.begin) / T.sizeof;
-		} else {
-			const a = (this.end / T.sizeof);
-			const b = ((Size * T.sizeof) - this.begin) / T.sizeof;
-			return a + b;
-		}
+		return this.length_ / T.sizeof;
+		//if(this.end < this.begin + 1) {
+		//	return 0UL;
+		//}
+		//if(this.end > this.begin) {
+		//	return (this.end - this.begin) / T.sizeof;
+		//} else {
+		//	const a = (this.end / T.sizeof);
+		//	const b = ((Size * T.sizeof) - this.begin) / T.sizeof;
+		//	return a + b;
+		//}
 	}
 
 	/// Ditto
 	pragma(inline, true)
 	@property size_t empty() const pure @nogc nothrow {
-		return this.begin == this.end;
+		//return this.begin == this.end;
+		return this.length == 0;
 	}
 
 	///
@@ -534,23 +536,6 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		return FixedSizeArraySlice!(typeof(this),const(T),Size)
 			(&this, cast(short)low, cast(short)high);
 	}
-
-	pragma(inline, true)
-	auto opCast(S)() {
-		return cast(S)(this.store[this.begin .. this.end]);
-	}
-
-	///
-	pure nothrow unittest {
-		FixedSizeArray!(char,32) fsa;
-		string h = "Hello World";
-
-		foreach(char c; h) {
-			fsa.insertBack(c);
-		}
-	
-		assert(cast(string)fsa == h);
-	}
 }
 
 unittest {
@@ -590,10 +575,10 @@ unittest {
 
 	FixedSizeArray!(char,64) fsa;
 	formattedWrite(fsa[], "%s %s %s", "Hello", "World", 42);
-	assert(cast(string)fsa == "Hello World 42", cast(string)fsa);
+	//assert(cast(string)fsa == "Hello World 42", cast(string)fsa);
 }
 
-pure nothrow unittest {
+pure unittest {
 	import exceptionhandling;
 
 	FixedSizeArray!(int,16) fsa;
@@ -770,26 +755,34 @@ unittest {
 }
 
 unittest {
+	import exceptionhandling;
 	string s = "Hellö Wärlß";
 	{
 		FixedSizeArray!(char,32) fsa;
 		foreach(dchar c; s) {
 			fsa.insertBack(c);
 		}
-		assert(cast(string)fsa == s);
+		assertEqual(fsa[], s);
 	}
 	{
 		import std.format;
 		FixedSizeArray!(char,32) fsa;
 		formattedWrite(fsa[], s);
-		assert(cast(string)fsa == s);
+		assertEqual(fsa[], s);
 	}
 }
 
 unittest {
+	import exceptionhandling;
+
 	FixedSizeArray!(int,2) fsa;
 	fsa.insertBack(0);
 	fsa.insertBack(1);
+
+	assertEqual(fsa[0], 0);	
+	assertEqual(fsa[1], 1);	
+	//assertEqual(fsa.front, 0);
+	//assertEqual(fsa.back, 1);
 }
 
 unittest {
