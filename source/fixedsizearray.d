@@ -89,7 +89,8 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	*/
 	bool disableDtor;
 
-	byte[T.sizeof * Size] store;
+	enum ByteCap = T.sizeof * Size;
+	byte[ByteCap] store;
 
 	pragma(inline, true)
 	this(Args...)(Args args) {
@@ -120,10 +121,9 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	pragma(inline, true)
 	void insertBack(S)(auto ref S t) @trusted if(is(Unqual!(S) == T)) {
 		import std.conv : emplace;
-		import std.stdio;
 		assert(this.length + 1 <= Size);
 
-		*(cast(T*)(&this.store[(this.base + this.length_) % Size])) = t;
+		*(cast(T*)(&this.store[(this.base + this.length_) % ByteCap])) = t;
 		this.length_ += T.sizeof;
 	}
 
@@ -149,7 +149,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 				 this.insertBack!T(it);
 			}
         } else static if(isAssignable!(T,S)) {
-			*(cast(T*)(&this.store[(this.base + this.length_) % Size])) = s;
+			*(cast(T*)(&this.store[(this.base + this.length_) % ByteCap])) = s;
 			this.length_ += T.sizeof;
 		} else {
 			static assert(false);
@@ -175,10 +175,11 @@ struct FixedSizeArray(T,size_t Size = 32) {
 
 		this.base -= T.sizeof;
 		if(this.base < 0) {
-			this.base = (T.sizeof * Size) - T.sizeof;
+			this.base = (ByteCap) - T.sizeof;
 		}
 
 		*(cast(T*)(&this.store[this.base])) = t;
+		this.length_ += T.sizeof;
 	}
 
 	pure @safe unittest {
@@ -242,20 +243,6 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		}
 	}
 
-	pure @safe nothrow unittest {
-		FixedSizeArray!(int,16) fsa;
-		for(int i = 0; i < 32; ++i) {
-			fsa.insertFront(i);
-			assert(fsa.length == 1);
-			assert(!fsa.empty);
-			assert(fsa.front == i);
-			assert(fsa.back == i);
-			fsa.removeBack();
-			assert(fsa.length == 0);
-			assert(fsa.empty);
-		}
-	}
-
 	/** This function emplaces an `S` element at the back if there is space.
 	Otherwise the behaviour is undefined.
 	*/
@@ -264,7 +251,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		import std.conv : emplace;
 		assert(this.length + 1 <= Size);
 
-		emplace(cast(T*)(&this.store[(this.base + this.length_) % Size]), args);
+		emplace(cast(T*)(&this.store[(this.base + this.length_) % ByteCap]), args);
 		this.length_ += T.sizeof;
 	}
 
@@ -314,7 +301,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 
 		//this.begin = (this.begin + T.sizeof) % (Size * T.sizeof);
 		this.base += T.sizeof;
-		if(this.base > Size) {
+		if(this.base >= ByteCap) {
 			this.base = 0;
 		}
 		this.length_ -= T.sizeof;
@@ -448,7 +435,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		import std.format : format;
 		assert(idx <= this.length, format("%s %s", idx, this.length));
 		return *(cast(T*)(&this.store[
-				(this.base + this.length_) % Size
+				(this.base + idx * T.sizeof) % ByteCap
 		]));
 	}
 
@@ -458,7 +445,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		import std.format : format;
 		assert(idx <= this.length, format("%s %s", idx, this.length));
 		return *(cast(const(T)*)(&this.store[
-				(this.base + this.length_) % Size
+				(this.base + idx * T.sizeof) % ByteCap
 		]));
 	}
 
@@ -578,41 +565,18 @@ unittest {
 	//assert(cast(string)fsa == "Hello World 42", cast(string)fsa);
 }
 
-pure unittest {
+unittest {
 	import exceptionhandling;
 
 	FixedSizeArray!(int,16) fsa;
-	foreach(it; [0,1,2,4,32,64,1024,2048,65000]) {
+	auto a = [0,1,2,4,32,64,1024,2048,65000];
+	foreach(idx, it; a) {
 		fsa.insertBack(it);
-		assert(fsa.front() == it);
-		assert(fsa.back() == it);
-		assert(fsa[0] == it);
-		assert(fsa.length == 1);
-		assert(!fsa.empty);
-
-		auto s = fsa[];
-		assert(s.length == 1);
-		assert(!s.empty);
-		cast(void)assertEqual(s.front, it);
-		cast(void)assertEqual(s.back, it);
-
-		auto sc = s;
-		auto sc2 = s;
-
-		s.popFront();
-		sc.popBack();
-		assert(s.length == 0);
-		assert(s.empty);
-		assert(sc.length == 0);
-		assert(sc.empty);
-
-		sc2.front = 1337;
-		cast(void)assertEqual(fsa.front, 1337);
-		cast(void)assertEqual(fsa.back, 1337);
-
-		fsa.removeBack();
-		assert(fsa.length == 0);
-		assert(fsa.empty);
+		assertEqual(fsa.length, idx + 1);
+		assertEqual(fsa.back, it);
+		for(int i = 0; i < idx; ++i) {
+			assertEqual(fsa[i], a[i]);
+		}
 	}
 }
 
@@ -756,24 +720,6 @@ unittest {
 
 unittest {
 	import exceptionhandling;
-	string s = "Hellö Wärlß";
-	{
-		FixedSizeArray!(char,32) fsa;
-		foreach(dchar c; s) {
-			fsa.insertBack(c);
-		}
-		assertEqual(fsa[], s);
-	}
-	{
-		import std.format;
-		FixedSizeArray!(char,32) fsa;
-		formattedWrite(fsa[], s);
-		assertEqual(fsa[], s);
-	}
-}
-
-unittest {
-	import exceptionhandling;
 
 	FixedSizeArray!(int,2) fsa;
 	fsa.insertBack(0);
@@ -781,30 +727,139 @@ unittest {
 
 	assertEqual(fsa[0], 0);	
 	assertEqual(fsa[1], 1);	
-	//assertEqual(fsa.front, 0);
-	//assertEqual(fsa.back, 1);
+	assertEqual(fsa.front, 0);
+	assertEqual(fsa.back, 1);
+}
+
+unittest {
+	import exceptionhandling;
+	import std.stdio;
+	string s = "Hellö Wärlß";
+	{
+		FixedSizeArray!(char,32) fsa;
+		foreach(dchar c; s) {
+			fsa.insertBack(c);
+		}
+		for(int i = 0; i < s.length; ++i) {
+			assert(fsa[i] == s[i]);
+		}
+	}
+	{
+		import std.format;
+		FixedSizeArray!(char,32) fsa;
+		formattedWrite(fsa[], s);
+		for(int i = 0; i < s.length; ++i) {
+			assert(fsa[i] == s[i]);
+		}
+	}
 }
 
 unittest {
 	import std.stdio;
-	enum size = 256;
-	//auto arrays = new FixedSizeArray!(Object, size)[size];
-	FixedSizeArray!(Object, size)[size] arrays;
+	import core.memory;
+	enum size = 128;
+	auto arrays = new FixedSizeArray!(int, size)[size];
+	GC.removeRoot(arrays.ptr);
+	//FixedSizeArray!(int, size)[size] arrays;
 	foreach (i; 0..size) {
 	    foreach (j; 0..size) {
-			writefln("%d %d %d", i, j, arrays[i].length);
-	        arrays[i].insertBack(new Object);
+			assert(arrays[i].length == j);
+	        arrays[i].insertBack(i * 1000 + j);
 	    }
 	}
-	foreach(ref it; arrays) {
+	/*foreach(ref it; arrays) {
 		writef("%d ", it.length);
 	}
-	writeln();
+	writeln();*/
+	bool[int] o;
+	foreach (i; 0..size) {
+	    foreach (j; 0..size) {
+			assert(arrays[i][j] !in o);
+	        o[arrays[i][j]] = true;
+	    }
+	}
+	assert(size * size == o.length);
+}
+
+// issue #1 won't fix not sure why
+unittest {
+	import std.stdio;
+	import core.memory;
+	enum size = 256;
+	auto arrays = new FixedSizeArray!(Object,size)();
+	//FixedSizeArray!(Object, size) arrays;
+	foreach (i; 0..size) {
+		auto o = new Object();
+		assert(arrays.length == i);
+		foreach(it; arrays) {
+			assert(it !is null);
+			assert(it.toHash());
+		}
+		writefln("first %d", i);
+	    arrays.insertBack(o);
+		assert(arrays.back is o);
+		assert(!arrays.empty);
+		assert(arrays.length == i + 1);
+	}
+
+	assert(arrays.length == size);
+	for(int i = 0; i < size; ++i) {
+		assert(arrays[i] !is null);
+		assert(arrays[i].toHash());
+	}
+	bool[Object] o;
+	foreach (i; 0..size) {
+		assert(arrays[i] !is null);
+		assert(arrays[i] !in o);
+		writefln("second %d %d %d", i, arrays.length,
+				arrays[i].toHash());
+	    o[arrays[i]] = true;
+	    
+	}
+	assert(size == o.length);
+}
+
+__EOF__
+
+unittest {
+	import std.stdio;
+	import core.memory;
+	enum size = 256;
+	auto arrays = new FixedSizeArray!(Object, size)[size];
+	for(int i = 0; i < size; ++i) {
+		arrays[i] = FixedSizeArray!(Object, size)();
+	}
+	//FixedSizeArray!(Object, size)[size] arrays;
+	foreach (i; 0..size) {
+	    foreach (j; 0..size) {
+			auto o = new Object();
+			assert(arrays[i].length == j);
+			foreach(it; arrays[i]) {
+				assert(it !is null);
+				assert(it.toHash());
+			}
+			writefln("first %d %d", i, j);
+	        arrays[i].insertBack(o);
+			assert(arrays[i].back is o);
+			assert(!arrays[i].empty);
+			assert(arrays[i].length == j + 1);
+	    }
+	}
+
+	for(int i = 0; i < size; ++i) {
+		assert(arrays[i].length == size);
+		for(int j = 0; j < size; ++j) {
+			assert(arrays[i][j] !is null);
+			assert(arrays[i][j].toHash());
+		}
+	}
 	bool[Object] o;
 	foreach (i; 0..size) {
 	    foreach (j; 0..size) {
-			//assert(arrays[i][j] !in o);
-			writefln("%d %d %d", i, j, arrays[i].length);
+			assert(arrays[i][j] !is null);
+			assert(arrays[i][j] !in o);
+			writefln("second %d %d %d %d", i, j, arrays[i].length,
+					arrays[i][j].toHash());
 	        o[arrays[i][j]] = true;
 	    }
 	}
