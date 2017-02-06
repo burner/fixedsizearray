@@ -791,11 +791,10 @@ unittest {
 	foreach (i; 0..size) {
 		auto o = new Object();
 		assert(arrays.length == i);
-		foreach(it; arrays) {
+		foreach(it; (*arrays)[]) {
 			assert(it !is null);
 			assert(it.toHash());
 		}
-		writefln("first %d", i);
 	    arrays.insertBack(o);
 		assert(arrays.back is o);
 		assert(!arrays.empty);
@@ -804,64 +803,26 @@ unittest {
 
 	assert(arrays.length == size);
 	for(int i = 0; i < size; ++i) {
-		assert(arrays[i] !is null);
-		assert(arrays[i].toHash());
+		assert((*arrays)[i] !is null);
+		assert((*arrays)[i].toHash());
 	}
 	bool[Object] o;
 	foreach (i; 0..size) {
-		assert(arrays[i] !is null);
-		assert(arrays[i] !in o);
-		writefln("second %d %d %d", i, arrays.length,
-				arrays[i].toHash());
-	    o[arrays[i]] = true;
+		assert((*arrays)[i] !is null);
+		assert((*arrays)[i] !in o);
+	    o[(*arrays)[i]] = true;
 	    
 	}
 	assert(size == o.length);
 }
 
-__EOF__
-
 unittest {
-	import std.stdio;
-	import core.memory;
-	enum size = 256;
-	auto arrays = new FixedSizeArray!(Object, size)[size];
-	for(int i = 0; i < size; ++i) {
-		arrays[i] = FixedSizeArray!(Object, size)();
-	}
-	//FixedSizeArray!(Object, size)[size] arrays;
-	foreach (i; 0..size) {
-	    foreach (j; 0..size) {
-			auto o = new Object();
-			assert(arrays[i].length == j);
-			foreach(it; arrays[i]) {
-				assert(it !is null);
-				assert(it.toHash());
-			}
-			writefln("first %d %d", i, j);
-	        arrays[i].insertBack(o);
-			assert(arrays[i].back is o);
-			assert(!arrays[i].empty);
-			assert(arrays[i].length == j + 1);
-	    }
-	}
-
-	for(int i = 0; i < size; ++i) {
-		assert(arrays[i].length == size);
-		for(int j = 0; j < size; ++j) {
-			assert(arrays[i][j] !is null);
-			assert(arrays[i][j].toHash());
-		}
-	}
-	bool[Object] o;
-	foreach (i; 0..size) {
-	    foreach (j; 0..size) {
-			assert(arrays[i][j] !is null);
-			assert(arrays[i][j] !in o);
-			writefln("second %d %d %d %d", i, j, arrays[i].length,
-					arrays[i][j].toHash());
-	        o[arrays[i][j]] = true;
-	    }
-	}
-	assert(size * size == o.length);
+	import exceptionhandling;
+	FixedSizeArray!(int,16) fsa;
+	fsa.insertFront(1337);
+	assert(!fsa.empty);
+	assertEqual(fsa.length, 1);
+	assertEqual(fsa.back, 1337);
+	assertEqual(fsa.front, 1337);
+	assertEqual(fsa.base, 15 * int.sizeof);
 }
