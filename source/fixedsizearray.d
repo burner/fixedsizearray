@@ -272,11 +272,6 @@ struct FixedSizeArray(T,size_t Size = 32) {
 			}
 		}
 
-		//this.end = this.end - T.sizeof;
-		//if(this.end < 0) {
-		//	this.end = (Size * T.sizeof) - T.sizeof;
-		//}
-
 		this.length_ -= T.sizeof;
 	}
 
@@ -843,4 +838,41 @@ unittest {
 	    }
 	}
 	assert(o.length == size * size);
+}
+
+unittest {
+	import exceptionhandling;
+	struct Foo {
+		int* a;
+		this(int* a) {
+			this.a = a;
+		}
+		~this() {
+			if(this.a !is null) {
+				++(*a);
+			}
+		}
+	}
+
+	{
+		int a = 0;
+		{
+			FixedSizeArray!(Foo,16) fsa;
+			for(int i = 0; i < 10; ++i) {
+				fsa.emplaceBack(&a);
+			}
+		}
+		assertEqual(a, 10);
+	}
+	{
+		int a = 0;
+		{
+			FixedSizeArray!(Foo,16) fsa;
+			fsa.disableDtor = true;
+			for(int i = 0; i < 10; ++i) {
+				fsa.emplaceBack(&a);
+			}
+		}
+		assertEqual(a, 0);
+	}
 }
