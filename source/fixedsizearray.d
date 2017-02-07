@@ -81,6 +81,8 @@ struct FixedSizeArraySlice(FSA,T, size_t Size) {
 
 struct FixedSizeArray(T,size_t Size = 32) {
 	import std.traits;
+	enum ByteCap = T.sizeof * Size;
+	align(8) void[ByteCap] store;
 	long base;
 	long length_;
 
@@ -88,9 +90,6 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	  will be called.
 	*/
 	bool disableDtor;
-
-	enum ByteCap = T.sizeof * Size;
-	byte[ByteCap] store;
 
 	pragma(inline, true)
 	this(Args...)(Args args) {
@@ -718,6 +717,7 @@ unittest {
 	}
 }
 
+// Test case Issue #2
 unittest {
 	import exceptionhandling;
 
@@ -825,4 +825,22 @@ unittest {
 	assertEqual(fsa.back, 1337);
 	assertEqual(fsa.front, 1337);
 	assertEqual(fsa.base, 15 * int.sizeof);
+}
+
+// Test case Issue #2
+unittest {
+	enum size = 256;
+	auto arrays = new FixedSizeArray!(Object, size * Object.sizeof)[size];
+	foreach (i; 0..size) {
+	    foreach (j; 0..size) {
+	        arrays[i].insertBack(new Object);
+	    }
+	}
+	bool[Object] o;
+	foreach (i; 0..size) {
+	    foreach (j; 0..size) {
+	        o[arrays[i][j]] = true;
+	    }
+	}
+	assert(o.length == size * size);
 }
