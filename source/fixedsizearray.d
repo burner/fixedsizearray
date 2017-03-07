@@ -122,7 +122,9 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		import std.conv : emplace;
 		assert(this.length + 1 <= Size);
 
-		*(cast(T*)(&this.store[(this.base + this.length_) % ByteCap])) = t;
+		*(cast(T*)(&this.store[
+			cast(size_t)((this.base + this.length_) % ByteCap)
+		])) = t;
 		this.length_ += T.sizeof;
 	}
 
@@ -148,7 +150,9 @@ struct FixedSizeArray(T,size_t Size = 32) {
 				 this.insertBack!T(it);
 			}
         } else static if(isAssignable!(T,S)) {
-			*(cast(T*)(&this.store[(this.base + this.length_) % ByteCap])) = s;
+			*(cast(T*)(&this.store[
+				cast(size_t)((this.base + this.length_) % ByteCap)
+			])) = s;
 			this.length_ += T.sizeof;
 		} else {
 			static assert(false);
@@ -174,7 +178,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 
 		this.base -= T.sizeof;
 		if(this.base < 0) {
-			this.base = (ByteCap) - T.sizeof;
+			this.base = cast(typeof(this.base))((ByteCap) - T.sizeof);
 		}
 
 		*(cast(T*)(&this.store[this.base])) = t;
@@ -250,7 +254,9 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		import std.conv : emplace;
 		assert(this.length + 1 <= Size);
 
-		emplace(cast(T*)(&this.store[(this.base + this.length_) % ByteCap]), args);
+		emplace(cast(T*)(&this.store[
+			cast(size_t)((this.base + this.length_) % ByteCap)]
+		), args);
 		this.length_ += T.sizeof;
 	}
 
@@ -389,13 +395,17 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	pragma(inline, true)
 	@property ref T back() @trusted {
 		assert(!this.empty);
-		return *(cast(T*)(&this.store[this.base + this.length_ - T.sizeof]));
+		return *(cast(T*)(&this.store[
+			cast(size_t)(this.base + this.length_ - T.sizeof)
+		]));
 	}
 
 	pragma(inline, true)
 	@property ref const(T) back() const @trusted {
 		assert(!this.empty);
-		return *(cast(T*)(&this.store[this.base + this.length_ - T.sizeof]));
+		return *(cast(T*)(&this.store[
+			cast(size_t)(this.base + this.length_ - T.sizeof)
+		]));
 	}
 
 	/// Ditto
@@ -429,7 +439,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		import std.format : format;
 		assert(idx <= this.length, format("%s %s", idx, this.length));
 		return *(cast(T*)(&this.store[
-				(this.base + idx * T.sizeof) % ByteCap
+				cast(size_t)((this.base + idx * T.sizeof) % ByteCap)
 		]));
 	}
 
@@ -439,7 +449,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		import std.format : format;
 		assert(idx <= this.length, format("%s %s", idx, this.length));
 		return *(cast(const(T)*)(&this.store[
-				(this.base + idx * T.sizeof) % ByteCap
+				cast(size_t)((this.base + idx * T.sizeof) % ByteCap)
 		]));
 	}
 
@@ -458,22 +468,11 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	pragma(inline, true)
 	@property size_t length() const pure @nogc nothrow {
 		return this.length_ / T.sizeof;
-		//if(this.end < this.begin + 1) {
-		//	return 0UL;
-		//}
-		//if(this.end > this.begin) {
-		//	return (this.end - this.begin) / T.sizeof;
-		//} else {
-		//	const a = (this.end / T.sizeof);
-		//	const b = ((Size * T.sizeof) - this.begin) / T.sizeof;
-		//	return a + b;
-		//}
 	}
 
 	/// Ditto
 	pragma(inline, true)
 	@property size_t empty() const pure @nogc nothrow {
-		//return this.begin == this.end;
 		return this.length == 0;
 	}
 
