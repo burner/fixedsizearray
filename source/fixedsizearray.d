@@ -27,22 +27,22 @@ struct FixedSizeArraySlice(FSA,T, size_t Size) {
 
 	pragma(inline, true)
 	@property ref T front() {
-		return (*this.fsa)[this.low];
+		return (*this.fsa)[cast(size_t)this.low];
 	}
 
 	pragma(inline, true)
 	@property ref const(T) front() const {
-		return (*this.fsa)[this.low];
+		return (*this.fsa)[cast(size_t)this.low];
 	}
 
 	pragma(inline, true)
 	@property ref T back() {
-		return (*this.fsa)[this.high - 1];
+		return (*this.fsa)[cast(size_t)(this.high - 1)];
 	}
 
 	pragma(inline, true)
 	@property ref const(T) back() const {
-		return (*this.fsa)[this.high - 1];
+		return (*this.fsa)[cast(size_t)(this.high - 1)];
 	}
 
 	pragma(inline, true)
@@ -181,7 +181,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 			this.base = cast(typeof(this.base))((ByteCap) - T.sizeof);
 		}
 
-		*(cast(T*)(&this.store[this.base])) = t;
+		*(cast(T*)(&this.store[cast(size_t)this.base])) = t;
 		this.length_ += T.sizeof;
 	}
 
@@ -349,7 +349,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 			this.removeBack();
 		} else {
 			for(long i = idx + 1; i < this.length; ++i) {
-				this[i - 1] = this[i];
+				this[cast(size_t)(i - 1)] = this[cast(size_t)i];
 			}
 			this.removeBack();
 		}
@@ -412,13 +412,13 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	pragma(inline, true)
 	@property ref T front() @trusted {
 		assert(!this.empty);
-		return *(cast(T*)(&this.store[this.base]));
+		return *(cast(T*)(&this.store[cast(size_t)this.base]));
 	}
 
 	pragma(inline, true)
 	@property ref const(T) front() const @trusted {
 		assert(!this.empty);
-		return *(cast(T*)(&this.store[this.base]));
+		return *(cast(T*)(&this.store[cast(size_t)this.base]));
 	}
 
 	///
