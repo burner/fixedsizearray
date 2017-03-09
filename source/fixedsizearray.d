@@ -22,7 +22,7 @@ struct FixedSizeArraySlice(FSA,T, size_t Size) {
 
 	pragma(inline, true)
 	@property size_t length() pure @safe nothrow @nogc {
-		return this.high - this.low;
+		return cast(size_t)(this.high - this.low);
 	}
 
 	pragma(inline, true)
@@ -467,12 +467,12 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	/// Gives the length of the array.
 	pragma(inline, true)
 	@property size_t length() const pure @nogc nothrow {
-		return this.length_ / T.sizeof;
+		return cast(size_t)(this.length_ / T.sizeof);
 	}
 
 	/// Ditto
 	pragma(inline, true)
-	@property size_t empty() const pure @nogc nothrow {
+	@property bool empty() const pure @nogc nothrow {
 		return this.length == 0;
 	}
 
