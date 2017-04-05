@@ -933,6 +933,14 @@ unittest {
 	for(int i = 10; i < 20; ++i) {
 		assertEqual(r[i-10], fsa[i]);
 	}
+
+	foreach(ref it; r) {
+		it = 0;
+	}
+
+	for(int i = 10; i < 20; ++i) {
+		assertEqual(r[i-10], 0);
+	}
 }
 
 unittest {
