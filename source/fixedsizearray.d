@@ -16,8 +16,8 @@ struct FixedSizeArraySlice(FSA,T, size_t Size) {
 	}
 
 	pragma(inline, true)
-	@property bool empty() pure @safe nothrow @nogc {
-		return this.low == this.high;
+	@property bool empty() const pure @safe nothrow @nogc {
+		return this.low >= this.high;
 	}
 
 	pragma(inline, true)
@@ -76,6 +76,25 @@ struct FixedSizeArraySlice(FSA,T, size_t Size) {
 	pragma(inline, true)
 	@property const(typeof(this)) save() const pure @safe nothrow @nogc {
 		return this;
+	}
+
+	pragma(inline, true)
+	typeof(this) opIndex() pure @safe nothrow @nogc {
+		return this;
+	}
+
+	pragma(inline, true)
+	typeof(this) opIndex(size_t l, size_t h) pure @safe nothrow @nogc {
+		return this.opSlice(l, h);
+	}
+
+	pragma(inline, true)
+	typeof(this) opSlice(size_t l, size_t h) pure @safe nothrow @nogc {
+		assert(l <= h);
+		return typeof(this)(this.fsa, 
+				cast(short)(this.low + l),
+				cast(short)(this.low + h)
+			);
 	}
 }
 
@@ -490,14 +509,17 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	}
 
 	pragma(inline, true)
-	auto opSlice() pure @nogc @safe nothrow {
+	FixedSizeArraySlice!(typeof(this),T,Size) opSlice() pure @nogc @safe nothrow {
 		return FixedSizeArraySlice!(typeof(this),T,Size)(&this, cast(short)0, 
 				cast(short)this.length
 		);
 	}
 	
 	pragma(inline, true)
-	auto opSlice(const size_t low, const size_t high) pure @nogc @safe nothrow {
+	FixedSizeArraySlice!(typeof(this),T,Size) opSlice(const size_t low, 
+			const size_t high) 
+			pure @nogc @safe nothrow 
+	{
 		return FixedSizeArraySlice!(typeof(this),T,Size)(&this, cast(short)low, 
 				cast(short)high
 		);
@@ -510,8 +532,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	}
 	
 	pragma(inline, true)
-	auto opSlice(const size_t low, const size_t high) pure @nogc @safe nothrow
-			const 
+	auto opSlice(const size_t low, const size_t high) pure @nogc @safe nothrow const 
 	{
 		return FixedSizeArraySlice!(typeof(this),const(T),Size)
 			(&this, cast(short)low, cast(short)high);
@@ -873,5 +894,67 @@ unittest {
 			}
 		}
 		assertEqual(a, 0);
+	}
+}
+
+unittest {
+	import std.range.primitives : hasAssignableElements, hasSlicing, isRandomAccessRange;
+	FixedSizeArray!(int,32) fsa;
+	auto s = fsa[];
+	static assert(hasSlicing!(typeof(s)));
+	static assert(isRandomAccessRange!(typeof(s)));
+	static assert(hasAssignableElements!(typeof(s)));
+}
+
+unittest {
+	import exceptionhandling;
+
+	FixedSizeArray!(int,32) fsa;
+	for(int i = 0; i < 32; ++i) {
+		fsa.insertBack(i);	
+	}
+
+	auto s = fsa[];
+	for(int i = 0; i < 32; ++i) {
+		assert(s[i] == i);
+	}
+	s = s[0 .. 33];
+	for(int i = 0; i < 32; ++i) {
+		assert(s[i] == i);
+	}
+
+	auto t = s.save;
+	s.popFront();
+	for(int i = 0; i < 32; ++i) {
+		assert(t[i] == i);
+	}
+
+	auto r = t[10, 20];
+	for(int i = 10; i < 20; ++i) {
+		assertEqual(r[i-10], fsa[i]);
+	}
+}
+
+unittest {
+	FixedSizeArray!(int,32) fsaM;
+	for(int i = 0; i < 32; ++i) {
+		fsaM.insertBack(i);	
+	}
+
+	const(FixedSizeArray!(int,32)) fsa = fsaM;
+
+	auto s = fsa[];
+	for(int i = 0; i < 32; ++i) {
+		assert(s[i] == i);
+	}
+	s = s[0 .. 33];
+	for(int i = 0; i < 32; ++i) {
+		assert(s[i] == i);
+	}
+
+	auto t = s.save;
+	s.popFront();
+	for(int i = 0; i < 32; ++i) {
+		assert(t[i] == i);
 	}
 }
