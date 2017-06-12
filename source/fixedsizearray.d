@@ -178,12 +178,26 @@ struct FixedSizeArray(T,size_t Size = 32) {
 		}
 	}
 
+	/// Ditto
+	pragma(inline, true)
+	void insertBack(S)(auto ref S defaultValue, size_t num) {
+		for(size_t i = 0; i < num; ++i) {
+			this.insertBack(defaultValue);
+		}
+	}
+
 	///
 	pure @safe unittest {
 		FixedSizeArray!(int,32) fsa;
 		fsa.insertBack(1337);
 		assert(fsa.length == 1);
 		assert(fsa[0] == 1337);
+
+		fsa.insertBack(99, 5);
+
+		foreach(it; fsa[1 .. fsa.length]) {
+			assert(it == 99);
+		}
 	}
 
 	/** This function inserts an `S` element at the front if there is space.
