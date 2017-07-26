@@ -6,6 +6,7 @@
 	"dependencies": {
 			"exceptionhandling": ">=0.1.0"
 	},
+	"dflags-dmd": ["-dip1000"],
 	"description": "A fixed size array implementation",
 	"copyright": "Copyright © 2016, burner",
 	"license": "LGPL3"
