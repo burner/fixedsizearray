@@ -429,7 +429,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	@property ref T back() @trusted {
 		assert(!this.empty);
 		return *(cast(T*)(&this.store[
-			cast(size_t)(this.base + this.length_ - T.sizeof)
+			cast(size_t)(this.base + this.length_ - T.sizeof) % ByteCap
 		]));
 	}
 
@@ -437,7 +437,7 @@ struct FixedSizeArray(T,size_t Size = 32) {
 	@property ref const(T) back() const @trusted {
 		assert(!this.empty);
 		return *(cast(T*)(&this.store[
-			cast(size_t)(this.base + this.length_ - T.sizeof)
+			cast(size_t)(this.base + this.length_ - T.sizeof) % ByteCap
 		]));
 	}
 
@@ -1006,5 +1006,24 @@ unittest {
 		}
 		assert(!a.empty);
 		assert(a.length <= c, format("%d < %d", a.length, c));
+
+		auto r = a[];
+		assert(r.back.a == i);
+		assert(r.front.a <= i);
+
+		foreach(it; r[]) {
+			assert(it.a <= i);
+		}
+
+		auto cr = (*(cast(const(typeof(a))*)(&a)));
+		assert(cr.back.a == i);
+		assert(cr.front.a <= i);
+
+		auto crr = cr[];
+		assert(crr.front.a <= i);
+		assert(crr.back.a <= i);
+		foreach(it; crr.save) {
+			assert(it.a <= i);
+		}
 	}
 }
