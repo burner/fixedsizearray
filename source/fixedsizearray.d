@@ -980,3 +980,31 @@ unittest {
 		assert(t[i] == i);
 	}
 }
+
+unittest {
+	import std.random : Random, uniform;
+	import std.format : format;
+	struct Data {
+		ulong a, b, c, d, e;
+	}
+
+	auto rnd = Random(1337);
+	FixedSizeArray!(Data,128) a;
+	for(size_t i = 0; i < 4096; ++i) {
+		Data d;
+		d.a = i;
+		d.b = i;
+		d.c = i;
+		d.d = i;
+		d.e = i;
+
+		a.insertBack(d);
+
+		int c = uniform(4,10, rnd);
+		while(a.length > c) {
+			a.removeFront();
+		}
+		assert(!a.empty);
+		assert(a.length <= c, format("%d < %d", a.length, c));
+	}
+}
