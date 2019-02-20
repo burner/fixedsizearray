@@ -554,6 +554,35 @@ struct FixedSizeArray(T,size_t Size = 32) {
 }
 
 unittest {
+	FixedSizeArray!(int, 10) fsa;
+	assert(fsa.empty);
+
+	fsa.insertBack(1);
+	assert(fsa.front == 1);
+	assert(fsa.back == 1);
+	assert(fsa[0] == 1);
+
+	fsa.insertFront(0);
+	assert(fsa.front == 0);
+	assert(fsa.back == 1);
+	assert(fsa[0] == 0);
+	assert(fsa[1] == 1);
+
+	int idx = 0;
+	foreach(it; fsa[0 .. fsa.length]) {
+		assert(it == idx);
+		++idx;
+	}
+
+	fsa.removeFront();
+	assert(fsa.front == 1);
+	assert(fsa.back == 1);
+	assert(fsa[0] == 1);
+
+	fsa.removeBack();
+	assert(fsa.empty);
+}
+unittest {
 	import exceptionhandling;
 	import std.stdio;
 
