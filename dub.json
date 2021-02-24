@@ -1,10 +1,10 @@
 {
 	"name": "fixedsizearray",
 	"authors": [
-		"burner"
+		"Robert burner Schadek"
 	],
 	"dependencies": {
-			"exceptionhandling": ">=0.1.0"
+			"exceptionhandling": ">=1.0.0"
 	},
 	"description": "A fixed size array implementation",
 	"copyright": "Copyright © 2016, burner",
